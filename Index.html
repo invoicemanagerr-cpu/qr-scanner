@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live QR Scanner</title>
+  <!-- Load the highly compatible html5-qrcode parsing engine -->
+  <script src="https://cloudflare.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; text-align: center; margin: 0; padding: 20px; background-color: #f4f6f9; color: #333; }
+    .scanner-card { max-width: 450px; margin: 20px auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    h2 { margin-top: 0; color: #1a73e8; }
+    #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #222; }
+    #status { margin-top: 20px; font-weight: 600; font-size: 1.1rem; min-height: 27px; transition: color 0.2s ease; }
+    /* Styling adjustments for html5-qrcode internal UI elements */
+    #reader button { background-color: #1a73e8 !important; color: white !important; border: none !important; padding: 10px 20px !important; font-size: 14px !important; border-radius: 6px !important; cursor: pointer !important; margin: 10px 0 !important; }
+    #reader select { padding: 8px !important; border-radius: 6px !important; margin: 10px 0 !important; }
+  </style>
+</head>
+<body>
+
+  <div class="scanner-card">
+    <h2>Live QR Scanner</h2>
+    <div id="reader"></div>
+    <div id="status">Waiting for camera permission...</div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // PASTE YOUR GOOGLE APPS SCRIPT DEPLOYMENT URL IN THE QUOTES BELOW:
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx3abWyEEEisG_x0VQ_LZpPoNLpR8-eNcoQfqMcBUtC94IXEkSS4X0iPocofSKLzZXP/exec"; 
+    // -------------------------------------------------------------
+
+    let html5QrcodeScanner;
+
+    function onScanSuccess(decodedText) {
+      // Instantly shut down the active camera stream to avoid duplicate duplicate line submissions
+      html5QrcodeScanner.clear();
+      
+      const statusElem = document.getElementById('status');
+      statusElem.style.color = "#333";
+      statusElem.innerText = "Transmitting to Google Sheets...";
+      
+      // Dispatch payload to Google Sheets via modern background fetch
+      fetch(WEB_APP_URL, {
+        method: "POST",
+        mode: "no-cors", // Bypasses browser CORS policy blocks natively
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ qrCode: decodedText })
+      })
+      .then(() => {
+        statusElem.innerText = "Logged successfully! Reloading camera...";
+        statusElem.style.color = "#2b8a3e";
+        
+        // Reactivate camera array loop automatically after 2.5 seconds
+        setTimeout(() => {
+          startScanner();
+        }, 2500);
+      })
+      .catch(err => {
+        statusElem.innerText = "Transmission Error: " + err;
+        statusElem.style.color = "#c92a2a";
+      });
+    }
+
+    function startScanner() {
+      document.getElementById('status').style.color = "#333";
+      document.getElementById('status').innerText = "Camera monitoring active.";
+      
+      html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+        fps: 10, 
+        qrbox: { width: 250, height: 250 },
+        rememberLastUsedCamera: true
+      });
+      
+      html5QrcodeScanner.render(onScanSuccess);
+    }
+
+    // Initialize layout instantly upon asset execution
+    window.addEventListener('load', startScanner);
+  </script>
+</body>
+</html>
